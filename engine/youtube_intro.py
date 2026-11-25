@@ -22,11 +22,13 @@ video can be appended seamlessly.
 Usage: python3 youtube_intro.py <config.json> <source.mp4> <out.mp4>
 """
 import json
+import os
 import subprocess
 import sys
 import wave
 
 import numpy as np
+from fontTools.ttLib import TTFont
 from PIL import Image, ImageDraw, ImageFont
 
 cfg = json.load(open(sys.argv[1]))
@@ -36,7 +38,6 @@ SR = cfg["audio_rate"]
 CAP = cfg["caption_style"]
 NOTO = "/usr/share/fonts/truetype/noto/"
 EMOJI_FONT = NOTO + "NotoColorEmoji.ttf"
-LIBASS_TO_PIL = 0.75          # libass renders Noto Bengali at ~0.75x Pillow's size (calibrated)
 
 COLORS = {  # ASS is &HBBGGRR&
     "yellow": "&H00F2FF&", "green": "&H2AFF3C&", "red": "&H2A2AFF&", "white": "&HFFFFFF&"}
@@ -46,8 +47,30 @@ LEAK_RGB = {"yellow": [(255, 235, 60), (255, 150, 0)],
 SETUP_Y = CAP["setup_y"]            # bottom anchor of setup line
 PUNCH_Y = CAP["punch_y"]            # bottom anchor of punch line
 
-_setup_font = ImageFont.truetype(NOTO + "NotoSansBengali-SemiBold.ttf", CAP["setup_size"] * LIBASS_TO_PIL)
-_punch_font = ImageFont.truetype(NOTO + "NotoSansBengali-Black.ttf", CAP["punch_size"] * LIBASS_TO_PIL)
+FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+
+
+def font_for(file, ass_size):
+    """Pillow font matching libass's rendering size (libass scales by em/(ascent-descent))."""
+    path = os.path.join(FONTS_DIR, file)
+    f = TTFont(path)
+    ratio = f["head"].unitsPerEm / (f["hhea"].ascent - f["hhea"].descent)
+    name = f["name"].getDebugName(1)
+    return ImageFont.truetype(path, ass_size * ratio), name
+
+
+def text_band(file, ass_size, anchor_y):
+    """Vertical extent (top, bottom) of Bangla letters for a bottom-anchored libass line."""
+    f = TTFont(os.path.join(FONTS_DIR, file))
+    h = f["hhea"]
+    px = ass_size / (h.ascent - h.descent)          # px per font unit
+    baseline = anchor_y + h.descent * px            # descent is negative
+    em = f["head"].unitsPerEm * px
+    return baseline - 0.92 * em, baseline + 0.18 * em
+
+
+_setup_font, SETUP_FAMILY = font_for(CAP["setup_font"], CAP["setup_size"])
+_punch_font, PUNCH_FAMILY = font_for(CAP["punch_font"], CAP["punch_size"])
 
 
 def width(font, text):
@@ -165,7 +188,7 @@ for c in cfg["captions"]:
         pre = setup_text[:setup_text.index(c["mark"])]
         mx0 = sx0 + width(_setup_font, pre) - 6
         mx1 = mx0 + width(_setup_font, c["mark"]) + 12
-        my0, my1 = SETUP_Y - 50, SETUP_Y - 6
+        my0, my1 = (round(v) for v in text_band(CAP["setup_font"], CAP["setup_size"], SETUP_Y))
         mt = int(c.get("mark_delay", 0.35) * 1000)
         ev.append(f"Dialogue: 0,{t_ass(sa)},{t_ass(end)},Mark,,0,0,0,,"
                   rf"{{\an7\pos(0,0)\clip({mx0:.0f},{my0},{mx0:.0f},{my1})"
@@ -187,7 +210,7 @@ for c in cfg["captions"]:
               rf"{{\an2\move({W // 2},{PUNCH_Y - 8},{W // 2},{PUNCH_Y},0,90){cl}\c{col}}}{c['punch']}")
 
     if c.get("bang"):
-        x = int(W / 2 - width(_punch_font, c["punch"]) / 2 - 62)
+        x = int(W / 2 - width(_punch_font, c["punch"]) / 2 - CAP.get("bang_gap", 80))
         ev.append(f"Dialogue: 3,{t_ass(pa + 0.05)},{t_ass(end)},Bang,,0,0,0,,"
                   rf"{{\an2\pos({x},{PUNCH_Y + 10})\frz-35\fscx10\fscy10"
                   rf"\t(0,130,\frz14\fscx125\fscy125)\t(130,230,\frz8\fscx100\fscy100)}}?!")
@@ -202,9 +225,9 @@ WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Setup,Noto Sans Bengali SemiBold,{CAP['setup_size']},&H00FFFFFF,&H00FFFFFF,&H00000000,&H50000000,0,0,0,0,100,100,0,0,1,2.5,3,2,20,20,0,1
-Style: Punch,Noto Sans Bengali Black,{CAP['punch_size']},&H0000F2FF,&H00FFFFFF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,5,5,2,20,20,0,1
-Style: Bang,DejaVu Sans,{int(CAP['punch_size'] * 1.6)},&H002A2AFF,&H00FFFFFF,&H00FFFFFF,&H64000000,1,1,0,0,100,100,0,0,1,5,4,2,0,0,0,1
+Style: Setup,{SETUP_FAMILY},{CAP['setup_size']},&H00FFFFFF,&H00FFFFFF,&H00000000,&H50000000,0,0,0,0,100,100,0,0,1,2.5,3,2,20,20,0,1
+Style: Punch,{PUNCH_FAMILY},{CAP['punch_size']},&H0000F2FF,&H00FFFFFF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,5,5,2,20,20,0,1
+Style: Bang,DejaVu Sans,{CAP.get('bang_size', 130)},&H002A2AFF,&H00FFFFFF,&H00FFFFFF,&H64000000,1,1,0,0,100,100,0,0,1,5,4,2,0,0,0,1
 Style: Mark,Arial,20,&H202A2AFF,&H202A2AFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
 
 [Events]
@@ -368,7 +391,7 @@ with wave.open(WAV, "wb") as w:
 
 # ---------- final: captions burned in, speech level untouched, SFX underneath ----------
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", tmp_v, "-i", SRC, "-i", WAV, "-filter_complex",
-                f"[0:v]ass={ASS}[v];[2:a]volume={cfg['sfx_volume']}[fx];"
+                f"[0:v]ass={ASS}:fontsdir={FONTS_DIR}[v];[2:a]volume={cfg['sfx_volume']}[fx];"
                 f"[1:a][fx]amix=inputs=2:normalize=0:duration=first,alimiter=limit=0.89:level=false[a]",
                 "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-crf", "16", "-preset", "slow",
                 "-pix_fmt", "yuv420p", "-r", str(FPS), "-c:a", "aac", "-b:a", "192k", "-ar", str(SR),

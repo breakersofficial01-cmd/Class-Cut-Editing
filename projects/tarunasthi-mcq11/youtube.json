@@ -93,11 +93,15 @@
     ]
   ],
   "caption_style": {
-    "setup_size": 46,
-    "setup_y": 586,
-    "punch_size": 86,
-    "punch_y": 680,
-    "sticker_size": 100
+    "setup_size": 72,
+    "setup_y": 578,
+    "punch_size": 118,
+    "punch_y": 686,
+    "sticker_size": 100,
+    "setup_font": "CCAnekSemi.ttf",
+    "punch_font": "CCGalada.ttf",
+    "bang_size": 128,
+    "bang_gap": 85
   },
   "captions": [
     {

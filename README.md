@@ -31,3 +31,9 @@ Style = the channel's reference video (first 20 s):
 - Jump-zoom punch-ins (teacher, board word, face close-up); pop SFX on each punch line.
 - Captions stop ~3 s before the end and zoom eases back to 1.0, so the join is invisible.
 - No top/bottom banners, no answer reveal, speech speed & level untouched.
+
+## Fonts (bundled in `engine/fonts`, all SIL OFL)
+Set in `caption_style` (`setup_font`, `punch_font` = file name in engine/fonts):
+CCGalada (stylish calligraphic), CCAtmaBold (playful bold), CCBalooBold (rounded), CCAnekBlack / CCAnekSemi
+(modern condensed), CCMinaBold, CCHindBold, NotoSansBengali-Black / SemiBold.
+Sizes are libass sizes; widths are measured per font, so stickers / "?!" / marker bars stay aligned.
