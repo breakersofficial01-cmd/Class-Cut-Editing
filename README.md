@@ -24,5 +24,10 @@ For the first ~20 s of a long video that continues after the cut:
 python3 -I engine/youtube_intro.py projects/<name>/youtube.json <source.mp4> <out.mp4>
 ```
 Keeps original speed, length, 1280x720@30, 44.1 kHz audio so the rest of the video appends seamlessly.
-Adds jump-zoom punch-ins on key words, flash + whoosh on slide changes, subtle SFX; zoom eases back
-to 1.0 before the end so the join is invisible. No captions, banners or answer reveal.
+Style = the channel's reference video (first 20 s):
+- Two-tier lower captions: small white setup line + big punch line (yellow / green / red, thick black
+  outline, pop-in), color-emoji sticker beside it, red "?!" on question beats.
+- Warm light-leak transitions (yellow / red / orange) at each idea change, with whoosh.
+- Jump-zoom punch-ins (teacher, board word, face close-up); pop SFX on each punch line.
+- Captions stop ~3 s before the end and zoom eases back to 1.0, so the join is invisible.
+- No top/bottom banners, no answer reveal, speech speed & level untouched.
