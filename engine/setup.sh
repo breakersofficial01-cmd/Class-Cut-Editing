@@ -17,7 +17,16 @@ fc-list | grep -q NotoColorEmoji || apt-get install -y -q fonts-noto-color-emoji
 echo "== tools"
 for t in ffmpeg ffprobe; do command -v $t >/dev/null || { echo "MISSING: $t"; }; done
 
-echo "== house fonts (Li Ador Noirrit, licensed - not stored in git)"
+echo "== house fonts (Li Ador Noirrit, licensed - not stored in git; owner re-uploads each session)"
+# auto-install from chat uploads (file names like <id>-Li_Ador_Noirrit_Bold_Italic.ttf)
+for up in /root/.claude/uploads/*/*; do
+  b=$(basename "$up" | tr '[:upper:]' '[:lower:]' | tr ' -' '__')
+  case "$b" in
+    *li_ador_noirrit_bold_italic*.ttf)       cp "$up" fonts/LiAdorNoirrit-BoldItalic.ttf ;;
+    *li_ador_noirrit_extralight_italic*.ttf) cp "$up" fonts/LiAdorNoirrit-ExtraLightItalic.ttf ;;
+    *li_ador_noirrit_italic*.ttf)            cp "$up" fonts/LiAdorNoirrit-Italic.ttf ;;
+  esac
+done 2>/dev/null
 missing=0
 for f in LiAdorNoirrit-BoldItalic.ttf LiAdorNoirrit-Italic.ttf LiAdorNoirrit-ExtraLightItalic.ttf; do
   [ -f fonts/$f ] || { echo "  MISSING fonts/$f"; missing=1; }

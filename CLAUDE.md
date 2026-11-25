@@ -32,5 +32,6 @@ style questions: they were settled with the owner and are written down there.
 - Network hosts needed (already allowed on the owner's Default cloud environment): drive.google.com,
   drive.usercontent.google.com, huggingface.co, us.aws.cdn.hf.co (+ package registries).
 - Li Ador Noirrit fonts are licensed (Lipighor) and **git-ignored**. If `engine/fonts/LiAdorNoirrit-*.ttf`
-  are missing, ask the owner to upload them.
+  are missing, ask the owner to upload them
+  (the owner re-uploads them every session by choice; `engine/setup.sh` auto-installs uploads).
 - Never commit videos, audio or fonts. Work in the scratchpad and deliver with SendUserFile.
