@@ -31,10 +31,32 @@ import numpy as np
 from fontTools.ttLib import TTFont
 from PIL import Image, ImageDraw, ImageFont
 
-cfg = json.load(open(sys.argv[1]))
 SRC, OUT = sys.argv[2], sys.argv[3]
-W, H, FPS = cfg["size"][0], cfg["size"][1], cfg["fps"]
-SR = cfg["audio_rate"]
+HOUSE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "style", "house_style.json")
+cfg = json.load(open(HOUSE))
+_proj = json.load(open(sys.argv[1]))
+_cap = {**cfg.get("caption_style", {}), **_proj.get("caption_style", {})}
+cfg.update(_proj)
+cfg["caption_style"] = _cap
+# Design space for captions / zoom targets is always 1280x720; the real frame is probed from the source.
+W, H = 1280, 720
+
+
+def _probe(path):
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                          "stream=codec_type,width,height,r_frame_rate,sample_rate", "-of", "json", path],
+                         capture_output=True, text=True, check=True).stdout
+    st = json.loads(out)["streams"]
+    v = next(x for x in st if x["codec_type"] == "video")
+    a = next((x for x in st if x["codec_type"] == "audio"), {"sample_rate": "44100"})
+    num, den = map(int, v["r_frame_rate"].split("/"))
+    return int(v["width"]), int(v["height"]), round(num / den, 3), int(a["sample_rate"])
+
+
+FW, FH, FPS, SR = _probe(SRC)
+if FPS == int(FPS):
+    FPS = int(FPS)
+KX, KY = FW / W, FH / H          # design -> frame scale
 CAP = cfg["caption_style"]
 NOTO = "/usr/share/fonts/truetype/noto/"
 EMOJI_FONT = NOTO + "NotoColorEmoji.ttf"
@@ -132,16 +154,18 @@ def zoom_for(ts):
     for s, e, z0, z1, cx, cy in cfg["zooms"]:
         if s <= ts < e:
             return z0 + (z1 - z0) * smooth((ts - s) / (e - s)), cx, cy
-    return 1.0, W / 2, H / 2
+    return 1.0, W / 2, H / 2  # design coords
 
 
 def crop_zoom(frame, z, cx, cy):
+    """cx, cy are design (1280x720) coords; frame is FWxFH."""
     if abs(z - 1.0) < 1e-3:
         return frame
-    cw, ch = W / z, H / z
-    x0 = min(max(cx - cw / 2, 0), W - cw)
-    y0 = min(max(cy - ch / 2, 0), H - ch)
-    return np.asarray(Image.fromarray(frame).resize((W, H), Image.LANCZOS,
+    cx, cy = cx * KX, cy * KY
+    cw, ch = FW / z, FH / z
+    x0 = min(max(cx - cw / 2, 0), FW - cw)
+    y0 = min(max(cy - ch / 2, 0), FH - ch)
+    return np.asarray(Image.fromarray(frame).resize((FW, FH), Image.LANCZOS,
                                                     box=(x0, y0, x0 + cw, y0 + ch)))
 
 
@@ -157,7 +181,7 @@ def leak_layer(p, kind):
     g1 = np.exp(-(((XX - x1) / (0.55 * W)) ** 2 + ((YY - 0.35 * H) / (0.7 * H)) ** 2))
     g2 = np.exp(-(((XX - x2) / (0.45 * W)) ** 2 + ((YY - 0.8 * H) / (0.5 * H)) ** 2))
     small = np.clip(g1[..., None] * c1 * 1.9 + g2[..., None] * c2 * 1.4, 0, 1) * a
-    return np.asarray(Image.fromarray((small * 255).astype(np.uint8)).resize((W, H), Image.BILINEAR),
+    return np.asarray(Image.fromarray((small * 255).astype(np.uint8)).resize((FW, FH), Image.BILINEAR),
                       np.float32) / 255
 
 
@@ -206,12 +230,12 @@ def apply_stickers(img, ts):
             rot = -18 * (1 - smooth(k / 0.18)) + 5 * np.sin(k * 5.5)
             bob = 4 * np.sin(k * 4.0)
             em = emoji_img(ch)
-            size = max(6, int(CAP["sticker_size"] * sc))
+            size = max(6, int(CAP["sticker_size"] * sc * KX))
             em = em.resize((size, max(6, int(size * em.height / em.width))), Image.LANCZOS)
             em = em.rotate(rot, expand=True, resample=Image.BICUBIC)
             if im is None:
                 im = Image.fromarray(img)
-            im.paste(em, (int(x - em.width / 2), int(y + bob - em.height / 2)), em)
+            im.paste(em, (int(x * KX - em.width / 2), int((y + bob) * KY - em.height / 2)), em)
     return np.asarray(im) if im is not None else img
 
 
@@ -342,15 +366,15 @@ dec = subprocess.Popen(["ffmpeg", "-v", "error", "-i", SRC, "-f", "rawvideo", "-
                         "-r", str(FPS), "-"], stdout=subprocess.PIPE)
 tmp_v = OUT + ".v.mp4"
 enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
-                        "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-crf", "12",
+                        "-s", f"{FW}x{FH}", "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-crf", "12",
                         "-preset", "fast", "-pix_fmt", "yuv420p", tmp_v], stdin=subprocess.PIPE)
-n, j = W * H * 3, 0
+n, j = FW * FH * 3, 0
 while True:
     b = dec.stdout.read(n)
     if len(b) < n:
         break
     ts = j / FPS
-    fr = np.frombuffer(b, np.uint8).reshape(H, W, 3)
+    fr = np.frombuffer(b, np.uint8).reshape(FH, FW, 3)
     z, cx, cy = zoom_for(ts)
     out = crop_zoom(fr, z, cx, cy)
     out = apply_leaks(out, ts)

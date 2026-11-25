@@ -1,12 +1,5 @@
 {
   "title": "Tarunasthi (cartilage) - first 20 s of the long YouTube video, reference style",
-  "size": [
-    1280,
-    720
-  ],
-  "fps": 30,
-  "audio_rate": 44100,
-  "sfx_volume": 0.65,
   "zooms": [
     [
       0.0,
@@ -73,7 +66,6 @@
       360
     ]
   ],
-  "leak_sec": 0.45,
   "leaks": [
     [
       4.0,
@@ -92,23 +84,6 @@
       "yellow"
     ]
   ],
-  "caption_style": {
-    "fonts": {
-      "bold": "LiAdorNoirrit-BoldItalic.ttf",
-      "regular": "LiAdorNoirrit-Italic.ttf",
-      "light": "LiAdorNoirrit-ExtraLightItalic.ttf"
-    },
-    "setup_size": 50,
-    "setup_y": 584,
-    "punch_size": 92,
-    "punch_y": 688,
-    "depth": 7,
-    "sticker_size": 100,
-    "bang_size": 120,
-    "bang_gap": 70,
-    "glow": 7,
-    "setup_glow": 3
-  },
   "captions": [
     {
       "setup_at": 0.1,

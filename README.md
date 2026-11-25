@@ -1,5 +1,22 @@
 # Class-Cut Editing
 
+**New session? Just say:** "edit the first 20 seconds of this video: <Drive link>".
+Claude Code reads `CLAUDE.md`, runs the `youtube-intro` skill (`.claude/skills/youtube-intro/SKILL.md`) and
+follows `docs/STYLE_GUIDE.md` (the approved house style). One render, QC'd, delivered.
+
+Quick manual run:
+```
+bash engine/setup.sh
+bash engine/fetch.sh "<drive link>" work/src.mp4
+python3 -I engine/transcribe.py work/src.mp4 work/words.json
+python3 -I engine/analyze.py   work/src.mp4 work/an
+# write projects/<slug>/youtube.json (copy projects/tarunasthi-mcq11/youtube.json)
+python3 -I engine/youtube_intro.py projects/<slug>/youtube.json work/src.mp4 work/out.mp4
+```
+
+---
+## History / older pipelines
+
 Turns raw Breaking School class clips into hook-first vertical shorts (Reels / TikTok / Shorts).
 
 ## Edit formula (applied automatically)
