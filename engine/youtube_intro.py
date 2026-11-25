@@ -69,8 +69,53 @@ def text_band(file, ass_size, anchor_y):
     return baseline - 0.92 * em, baseline + 0.18 * em
 
 
-_setup_font, SETUP_FAMILY = font_for(CAP["setup_font"], CAP["setup_size"])
-_punch_font, PUNCH_FAMILY = font_for(CAP["punch_font"], CAP["punch_size"])
+# Font roles (files in engine/fonts): bold = punch, regular = setup, light = accent words.
+# Inline markup: [l]..[/l] -> light weight inside a punch line; setup "mark" words -> bold.
+FONTSET = CAP["fonts"]
+_fullname = {k: TTFont(os.path.join(FONTS_DIR, f))["name"].getDebugName(4) for k, f in FONTSET.items()}
+_pil = {}
+
+
+def pil(role, size):
+    key = (role, size)
+    if key not in _pil:
+        _pil[key] = font_for(FONTSET[role], size)[0]
+    return _pil[key]
+
+
+def segments(text, base, alt="light"):
+    """'a [l]b[/l] c' -> [('a ', base), ('b', alt), (' c', base)]"""
+    out, cur = [], base
+    for part in text.replace("[/l]", "\x00" + base).replace("[l]", "\x00" + alt).split("\x00"):
+        role = cur
+        for r in (base, alt):
+            if part.startswith(r):
+                role, part = r, part[len(r):]
+                break
+        if part:
+            out.append((part, role))
+        cur = role
+    return out
+
+
+def seg_width(segs, size):
+    return sum(pil(r, size).getlength(t) for t, r in segs)
+
+
+def seg_ass(segs):
+    return "".join(rf"{{\fn{_fullname[r]}}}{t}" for t, r in segs)
+
+
+def plain(text):
+    return text.replace("[l]", "").replace("[/l]", "")
+
+
+class _W:  # width helper used by sticker placement
+    def getlength(self, text):
+        return seg_width(segments(text, "bold"), CAP["punch_size"])
+
+
+_punch_font = _W()
 
 
 def width(font, text):
@@ -141,7 +186,7 @@ def emoji_img(ch):
 stickers = []  # (start, end, emoji, x, y)
 for c in cfg["captions"]:
     if c.get("sticker"):
-        x = W / 2 + width(_punch_font, c["punch"]) / 2 + 18 + CAP["sticker_size"] / 2
+        x = W / 2 + _punch_font.getlength(c["punch"]) / 2 + 28 + CAP["sticker_size"] / 2
         c["_sticker_at"] = c["punch_at"] + 0.05
         stickers.append((c["_sticker_at"], c["end"], c["sticker"], min(x, W - 60), PUNCH_Y - 70))
 
@@ -175,45 +220,96 @@ def t_ass(t):
     return f"0:{int(t // 60):02d}:{t % 60:05.2f}"
 
 
+DARK = {"yellow": (0, 150, 190), "green": (20, 150, 25), "red": (20, 20, 170), "white": (90, 90, 90)}  # BGR
+
+
+def bgr(t):
+    return "&H%02X%02X%02X&" % t
+
+
+def mix(a, b, k):
+    return tuple(int(a[i] + (b[i] - a[i]) * k) for i in range(3))
+
+
+def layered(start, end, layer0, x0, y0, x1, y1, move_ms, clip, body, size, accent, depth, step,
+            bord, shadow_off, tint_band=None):
+    """3D text: soft shadow -> extrusion (back black -> front accent-dark) -> white face -> bevel tint."""
+    out = []
+
+    def mv(dx, dy):
+        if move_ms:
+            return rf"\move({x0 + dx:.0f},{y0 + dy:.0f},{x1 + dx:.0f},{y1 + dy:.0f},0,{move_ms})"
+        return rf"\pos({x1 + dx:.0f},{y1 + dy:.0f})"
+
+    base = rf"\an2\fs{size}\b0\i0{clip}"
+    out.append((layer0, rf"{base}{mv(shadow_off, shadow_off + 2)}\1c&H000000&\3c&H000000&\bord{bord + 2}"
+                        rf"\blur6\1a&H70&\3a&H70&\shad0"))
+    for k in range(depth, 0, -1):
+        col = bgr(mix((10, 10, 10), DARK[accent], 1 - (k - 1) / max(depth, 1)))
+        out.append((layer0 + 1 + depth - k,
+                    rf"{base}{mv(k * step, k * step)}\1c{col}\3c{col}\bord{bord}\shad0\blur0.6"))
+    out.append((layer0 + depth + 2, rf"{base}{mv(0, 0)}\1c&HFFFFFF&\3c&H101010&\bord{bord}\shad0"))
+    if tint_band:
+        ty0, ty1 = tint_band
+        out.append((layer0 + depth + 3,
+                    rf"\an2\fs{size}\b0\i0\clip(0,{ty0:.0f},{W},{ty1:.0f}){mv(0, 0)}"
+                    rf"\1c&HDCD2C8&\3c&H101010&\bord0\shad0\blur0.8"))
+    return [f"Dialogue: {L},{t_ass(start)},{t_ass(end)},Txt,,0,0,0,,{{{tags}}}{body}" for L, tags in out]
+
+
 ev = []
+PS, SS = CAP["punch_size"], CAP["setup_size"]
 for c in cfg["captions"]:
-    col = COLORS[c["color"]]
-    sw = width(_setup_font, c["setup"])
-    sx0, sx1 = W / 2 - sw / 2, W / 2 + sw / 2
-    setup_text = c["setup"]
+    acc = c["color"]
     sa, pa, end = c["setup_at"], c["punch_at"], c["end"]
 
-    # marker highlight sweep behind key words of the setup line
-    if c.get("mark") and c["mark"] in setup_text:
-        pre = setup_text[:setup_text.index(c["mark"])]
-        mx0 = sx0 + width(_setup_font, pre) - 6
-        mx1 = mx0 + width(_setup_font, c["mark"]) + 12
-        my0, my1 = (round(v) for v in text_band(CAP["setup_font"], CAP["setup_size"], SETUP_Y))
+    # ---- setup line: regular italic, marked words bold italic over a red marker ----
+    if c.get("mark") and c["mark"] in c["setup"]:
+        i = c["setup"].index(c["mark"])
+        ssegs = [(c["setup"][:i], "regular"), (c["mark"], "bold"), (c["setup"][i + len(c["mark"]):], "regular")]
+        ssegs = [x for x in ssegs if x[0]]
+    else:
+        ssegs = [(c["setup"], "regular")]
+    sw = seg_width(ssegs, SS)
+    sx0, sx1 = W / 2 - sw / 2, W / 2 + sw / 2
+    if c.get("mark") and c["mark"] in c["setup"]:
+        mx0 = sx0 + seg_width(ssegs[:1], SS) - 8 if ssegs[0][1] == "regular" else sx0 - 8
+        mx1 = mx0 + pil("bold", SS).getlength(c["mark"]) + 16
+        my0, my1 = (round(v) for v in text_band(FONTSET["regular"], SS, SETUP_Y))
         mt = int(c.get("mark_delay", 0.35) * 1000)
         ev.append(f"Dialogue: 0,{t_ass(sa)},{t_ass(end)},Mark,,0,0,0,,"
                   rf"{{\an7\pos(0,0)\clip({mx0:.0f},{my0},{mx0:.0f},{my1})"
                   rf"\t({mt},{mt + 260},\clip({mx0:.0f},{my0},{mx1:.0f},{my1}))\p1}}"
                   f"m {mx0:.0f} {my0 + 4} l {mx1:.0f} {my0} {mx1 - 4:.0f} {my1} {mx0 + 3:.0f} {my1 - 2}")
-        setup_text = setup_text.replace(c["mark"], r"{\c&H00F2FF&}" + c["mark"] + r"{\c&HFFFFFF&}")
         c["_mark_at"] = sa + mt / 1000
+    wipe = rf"\clip({sx0 - 20:.0f},0,{sx0 - 20:.0f},{H})\t(0,300,\clip({sx0 - 20:.0f},0,{sx1 + 20:.0f},{H}))"
+    ev += layered(sa, end, 1, W / 2, SETUP_Y, W / 2, SETUP_Y, 0, wipe, seg_ass(ssegs), SS, "white",
+                  depth=3, step=1.0, bord=2.5, shadow_off=3)
 
-    # setup: left->right wipe reveal
-    ev.append(f"Dialogue: 1,{t_ass(sa)},{t_ass(end)},Setup,,0,0,0,,"
-              rf"{{\an2\pos({W // 2},{SETUP_Y})\clip({sx0 - 12:.0f},0,{sx0 - 12:.0f},{H})"
-              rf"\t(0,300,\clip({sx0 - 12:.0f},0,{sx1 + 12:.0f},{H}))}}{setup_text}")
-
-    # punch: slides up from behind an invisible baseline, with overshoot
-    cl = rf"\clip(0,0,{W},{PUNCH_Y + 8})"
-    ev.append(f"Dialogue: 2,{t_ass(pa)},{t_ass(pa + 0.14)},Punch,,0,0,0,,"
-              rf"{{\an2\move({W // 2},{PUNCH_Y + 95},{W // 2},{PUNCH_Y - 8},0,140){cl}\c{col}}}{c['punch']}")
-    ev.append(f"Dialogue: 2,{t_ass(pa + 0.14)},{t_ass(end)},Punch,,0,0,0,,"
-              rf"{{\an2\move({W // 2},{PUNCH_Y - 8},{W // 2},{PUNCH_Y},0,90){cl}\c{col}}}{c['punch']}")
+    # ---- punch line: bold italic (+ light accent words), 3D, slides up then settles ----
+    psegs = segments(c["punch"], "bold")
+    body = seg_ass(psegs)
+    mask = rf"\clip(0,0,{W},{PUNCH_Y + 10})"
+    d = CAP.get("depth", 7)
+    ty0, ty1 = text_band(FONTSET["bold"], PS, PUNCH_Y)
+    band = (ty0 + (ty1 - ty0) * 0.52, ty1 + 6)
+    ev += layered(pa, pa + 0.14, 10, W / 2, PUNCH_Y + 110, W / 2, PUNCH_Y - 10, 140, mask, body, PS, acc,
+                  depth=d, step=1.3, bord=4, shadow_off=d * 1.3 + 4)
+    ev += layered(pa + 0.14, end, 10, W / 2, PUNCH_Y - 10, W / 2, PUNCH_Y, 90, "", body, PS, acc,
+                  depth=d, step=1.3, bord=4, shadow_off=d * 1.3 + 4, tint_band=band)
 
     if c.get("bang"):
-        x = int(W / 2 - width(_punch_font, c["punch"]) / 2 - CAP.get("bang_gap", 80))
-        ev.append(f"Dialogue: 3,{t_ass(pa + 0.05)},{t_ass(end)},Bang,,0,0,0,,"
-                  rf"{{\an2\pos({x},{PUNCH_Y + 10})\frz-35\fscx10\fscy10"
-                  rf"\t(0,130,\frz14\fscx125\fscy125)\t(130,230,\frz8\fscx100\fscy100)}}?!")
+        x = W / 2 - _punch_font.getlength(c["punch"]) / 2 - CAP.get("bang_gap", 80)
+
+        def bang_tags(dx):
+            return (rf"\an2\pos({x + dx:.0f},{PUNCH_Y + 6 + dx:.0f})\fn{_fullname['bold']}"
+                    rf"\fs{CAP.get('bang_size', 130)}\b0\i0\frz-35\fscx10\fscy10"
+                    rf"\t(0,130,\frz14\fscx125\fscy125)\t(130,230,\frz8\fscx100\fscy100)")
+        for k in range(5, 0, -1):
+            ev.append(f"Dialogue: {35 - k},{t_ass(pa + 0.05)},{t_ass(end)},Txt,,0,0,0,,"
+                      f"{{{bang_tags(k * 1.4)}\\1c&H101070&\\3c&H101070&\\bord4\\shad0}}?!")
+        ev.append(f"Dialogue: 36,{t_ass(pa + 0.05)},{t_ass(end)},Txt,,0,0,0,,"
+                  f"{{{bang_tags(0)}\\1c&H2A2AFF&\\3c&HFFFFFF&\\bord4\\shad0}}?!")
         c["_bang_at"] = pa + 0.05
 
 ass = f"""[Script Info]
@@ -225,9 +321,7 @@ WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Setup,{SETUP_FAMILY},{CAP['setup_size']},&H00FFFFFF,&H00FFFFFF,&H00000000,&H50000000,0,0,0,0,100,100,0,0,1,2.5,3,2,20,20,0,1
-Style: Punch,{PUNCH_FAMILY},{CAP['punch_size']},&H0000F2FF,&H00FFFFFF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,5,5,2,20,20,0,1
-Style: Bang,DejaVu Sans,{CAP.get('bang_size', 130)},&H002A2AFF,&H00FFFFFF,&H00FFFFFF,&H64000000,1,1,0,0,100,100,0,0,1,5,4,2,0,0,0,1
+Style: Txt,{_fullname['bold']},{PS},&H00FFFFFF,&H00FFFFFF,&H00101010,&H00000000,0,0,0,0,100,100,0,0,1,4,0,2,0,0,0,1
 Style: Mark,Arial,20,&H202A2AFF,&H202A2AFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
 
 [Events]

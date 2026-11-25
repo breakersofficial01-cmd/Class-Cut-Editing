@@ -2,3 +2,4 @@
 *.wav
 *.raw
 __pycache__/
+engine/fonts/LiAdor*

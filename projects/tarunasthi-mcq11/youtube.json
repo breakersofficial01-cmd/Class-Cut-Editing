@@ -93,15 +93,19 @@
     ]
   ],
   "caption_style": {
-    "setup_size": 72,
-    "setup_y": 578,
-    "punch_size": 118,
-    "punch_y": 686,
+    "fonts": {
+      "bold": "LiAdorNoirrit-BoldItalic.ttf",
+      "regular": "LiAdorNoirrit-Italic.ttf",
+      "light": "LiAdorNoirrit-ExtraLightItalic.ttf"
+    },
+    "setup_size": 50,
+    "setup_y": 584,
+    "punch_size": 92,
+    "punch_y": 688,
+    "depth": 7,
     "sticker_size": 100,
-    "setup_font": "CCAnekSemi.ttf",
-    "punch_font": "CCGalada.ttf",
-    "bang_size": 128,
-    "bang_gap": 85
+    "bang_size": 120,
+    "bang_gap": 70
   },
   "captions": [
     {
@@ -109,7 +113,7 @@
       "punch_at": 1.44,
       "end": 2.5,
       "setup": "এখন আমরা শুরু করছি",
-      "punch": "নতুন টপিক!",
+      "punch": "[l]নতুন[/l] টপিক!",
       "color": "green",
       "sticker": "📚"
     },
@@ -127,7 +131,7 @@
       "punch_at": 5.16,
       "end": 6.2,
       "setup": "এই টপিক থেকে",
-      "punch": "কী কী প্রশ্ন আসে?",
+      "punch": "[l]কী কী[/l] প্রশ্ন আসে?",
       "color": "green",
       "sticker": "🤔"
     },
@@ -149,7 +153,7 @@
       "setup": "কেউ হঠাৎ প্রশ্ন করলে",
       "mark": "হঠাৎ প্রশ্ন",
       "mark_delay": 0.5,
-      "punch": "এই পার্থক্যগুলো লিখবে!",
+      "punch": "[l]এই[/l] পার্থক্যগুলো লিখবে!",
       "color": "yellow",
       "sticker": "✍️"
     },
@@ -158,7 +162,7 @@
       "punch_at": 16.7,
       "end": 18.05,
       "setup": "যদিও বইয়ে",
-      "punch": "পার্থক্য দেওয়া নাই!",
+      "punch": "পার্থক্য [l]দেওয়া[/l] নাই!",
       "color": "red",
       "sticker": "📖"
     }

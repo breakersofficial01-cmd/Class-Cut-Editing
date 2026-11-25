@@ -37,3 +37,10 @@ Set in `caption_style` (`setup_font`, `punch_font` = file name in engine/fonts):
 CCGalada (stylish calligraphic), CCAtmaBold (playful bold), CCBalooBold (rounded), CCAnekBlack / CCAnekSemi
 (modern condensed), CCMinaBold, CCHindBold, NotoSansBengali-Black / SemiBold.
 Sizes are libass sizes; widths are measured per font, so stickers / "?!" / marker bars stay aligned.
+
+## Current house style (v5): Li Ador Noirrit, white 3D text
+- Punch line: Li Ador Noirrit **Bold Italic**; accent words `[l]..[/l]` in **ExtraLight Italic**.
+- Setup line: Li Ador Noirrit **Italic**; `mark` words switch to Bold Italic over the red marker sweep.
+- 3D: white face + lower bevel tint, black outline, 7-step extrusion (black -> caption accent color), soft shadow.
+- Li Ador fonts are licensed by Lipighor (no redistribution), so they are **git-ignored**. Put the three
+  .ttf files in `engine/fonts/` as LiAdorNoirrit-BoldItalic.ttf / -Italic.ttf / -ExtraLightItalic.ttf.
