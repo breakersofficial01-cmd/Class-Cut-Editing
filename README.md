@@ -17,3 +17,12 @@ engine/build.sh <source.mp4> projects/<name> <work_dir>   # -> <work_dir>/final_
 ```
 Each video gets a `projects/<name>/config.json` (zooms, captions, hook/question/answer text, SFX cues).
 Captions are timed from a faster-whisper large-v3 transcript, then corrected by hand.
+
+## YouTube long-form intro (16:9, no text)
+For the first ~20 s of a long video that continues after the cut:
+```
+python3 -I engine/youtube_intro.py projects/<name>/youtube.json <source.mp4> <out.mp4>
+```
+Keeps original speed, length, 1280x720@30, 44.1 kHz audio so the rest of the video appends seamlessly.
+Adds jump-zoom punch-ins on key words, flash + whoosh on slide changes, subtle SFX; zoom eases back
+to 1.0 before the end so the join is invisible. No captions, banners or answer reveal.
