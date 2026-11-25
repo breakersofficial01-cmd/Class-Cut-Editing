@@ -41,6 +41,7 @@ Sizes are libass sizes; widths are measured per font, so stickers / "?!" / marke
 ## Current house style (v5): Li Ador Noirrit, white 3D text
 - Punch line: Li Ador Noirrit **Bold Italic**; accent words `[l]..[/l]` in **ExtraLight Italic**.
 - Setup line: Li Ador Noirrit **Italic**; `mark` words switch to Bold Italic over the red marker sweep.
-- 3D: white face + lower bevel tint, black outline, 7-step extrusion (black -> caption accent color), soft shadow.
+- Palette: WHITE text + ONE accent, YELLOW only (yellow glow, gold 3D extrusion, yellow marker, yellow leaks).
+  No red / green / other colors. 3D = white face, black outline, 7-step gold extrusion, yellow glow, soft shadow.
 - Li Ador fonts are licensed by Lipighor (no redistribution), so they are **git-ignored**. Put the three
   .ttf files in `engine/fonts/` as LiAdorNoirrit-BoldItalic.ttf / -Italic.ttf / -ExtraLightItalic.ttf.

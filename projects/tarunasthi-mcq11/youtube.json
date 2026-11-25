@@ -81,11 +81,11 @@
     ],
     [
       6.1,
-      "red"
+      "yellow"
     ],
     [
       12.6,
-      "orange"
+      "yellow"
     ],
     [
       15.75,
@@ -105,7 +105,9 @@
     "depth": 7,
     "sticker_size": 100,
     "bang_size": 120,
-    "bang_gap": 70
+    "bang_gap": 70,
+    "glow": 7,
+    "setup_glow": 3
   },
   "captions": [
     {
@@ -114,7 +116,7 @@
       "end": 2.5,
       "setup": "এখন আমরা শুরু করছি",
       "punch": "[l]নতুন[/l] টপিক!",
-      "color": "green",
+      "color": "yellow",
       "sticker": "📚"
     },
     {
@@ -132,7 +134,7 @@
       "end": 6.2,
       "setup": "এই টপিক থেকে",
       "punch": "[l]কী কী[/l] প্রশ্ন আসে?",
-      "color": "green",
+      "color": "yellow",
       "sticker": "🤔"
     },
     {
@@ -143,15 +145,15 @@
       "mark": "অস্থি আর তরুণাস্থির",
       "mark_delay": 0.4,
       "punch": "পার্থক্য কী?",
-      "color": "red",
+      "color": "yellow",
       "bang": true
     },
     {
       "setup_at": 12.78,
       "punch_at": 14.7,
       "end": 15.9,
-      "setup": "কেউ হঠাৎ প্রশ্ন করলে",
-      "mark": "হঠাৎ প্রশ্ন",
+      "setup": "কেউ Hard প্রশ্ন করলে",
+      "mark": "Hard প্রশ্ন",
       "mark_delay": 0.5,
       "punch": "[l]এই[/l] পার্থক্যগুলো লিখবে!",
       "color": "yellow",
@@ -163,7 +165,7 @@
       "end": 18.05,
       "setup": "যদিও বইয়ে",
       "punch": "পার্থক্য [l]দেওয়া[/l] নাই!",
-      "color": "red",
+      "color": "yellow",
       "sticker": "📖"
     }
   ],

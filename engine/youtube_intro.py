@@ -41,7 +41,7 @@ EMOJI_FONT = NOTO + "NotoColorEmoji.ttf"
 
 COLORS = {  # ASS is &HBBGGRR&
     "yellow": "&H00F2FF&", "green": "&H2AFF3C&", "red": "&H2A2AFF&", "white": "&HFFFFFF&"}
-LEAK_RGB = {"yellow": [(255, 235, 60), (255, 150, 0)],
+LEAK_RGB = {"yellow": [(255, 238, 80), (255, 205, 30)],
             "red": [(255, 50, 25), (255, 140, 0)],
             "orange": [(255, 140, 20), (255, 60, 30)]}
 SETUP_Y = CAP["setup_y"]            # bottom anchor of setup line
@@ -220,7 +220,10 @@ def t_ass(t):
     return f"0:{int(t // 60):02d}:{t % 60:05.2f}"
 
 
-DARK = {"yellow": (0, 150, 190), "green": (20, 150, 25), "red": (20, 20, 170), "white": (90, 90, 90)}  # BGR
+# House palette: white text + ONE accent (yellow). Extrusion front edge = gold, glow = yellow.
+GOLD = (0, 185, 240)          # BGR
+GLOW = "&H00D7FF&"            # yellow glow (BGR)
+DARK = {k: GOLD for k in ("yellow", "green", "red", "white")}
 
 
 def bgr(t):
@@ -232,7 +235,7 @@ def mix(a, b, k):
 
 
 def layered(start, end, layer0, x0, y0, x1, y1, move_ms, clip, body, size, accent, depth, step,
-            bord, shadow_off, tint_band=None):
+            bord, shadow_off, tint_band=None, glow=0):
     """3D text: soft shadow -> extrusion (back black -> front accent-dark) -> white face -> bevel tint."""
     out = []
 
@@ -244,6 +247,9 @@ def layered(start, end, layer0, x0, y0, x1, y1, move_ms, clip, body, size, accen
     base = rf"\an2\fs{size}\b0\i0{clip}"
     out.append((layer0, rf"{base}{mv(shadow_off, shadow_off + 2)}\1c&H000000&\3c&H000000&\bord{bord + 2}"
                         rf"\blur6\1a&H70&\3a&H70&\shad0"))
+    if glow:
+        out.append((layer0, rf"{base}{mv(0, 0)}\1c{GLOW}\3c{GLOW}\bord{bord + glow}\blur{glow * 1.8:.0f}"
+                            rf"\1a&H50&\3a&H50&\shad0"))
     for k in range(depth, 0, -1):
         col = bgr(mix((10, 10, 10), DARK[accent], 1 - (k - 1) / max(depth, 1)))
         out.append((layer0 + 1 + depth - k,
@@ -284,7 +290,7 @@ for c in cfg["captions"]:
         c["_mark_at"] = sa + mt / 1000
     wipe = rf"\clip({sx0 - 20:.0f},0,{sx0 - 20:.0f},{H})\t(0,300,\clip({sx0 - 20:.0f},0,{sx1 + 20:.0f},{H}))"
     ev += layered(sa, end, 1, W / 2, SETUP_Y, W / 2, SETUP_Y, 0, wipe, seg_ass(ssegs), SS, "white",
-                  depth=3, step=1.0, bord=2.5, shadow_off=3)
+                  depth=3, step=1.0, bord=2.5, shadow_off=3, glow=CAP.get("setup_glow", 3))
 
     # ---- punch line: bold italic (+ light accent words), 3D, slides up then settles ----
     psegs = segments(c["punch"], "bold")
@@ -294,9 +300,10 @@ for c in cfg["captions"]:
     ty0, ty1 = text_band(FONTSET["bold"], PS, PUNCH_Y)
     band = (ty0 + (ty1 - ty0) * 0.52, ty1 + 6)
     ev += layered(pa, pa + 0.14, 10, W / 2, PUNCH_Y + 110, W / 2, PUNCH_Y - 10, 140, mask, body, PS, acc,
-                  depth=d, step=1.3, bord=4, shadow_off=d * 1.3 + 4)
+                  depth=d, step=1.3, bord=4, shadow_off=d * 1.3 + 4, glow=CAP.get("glow", 7))
     ev += layered(pa + 0.14, end, 10, W / 2, PUNCH_Y - 10, W / 2, PUNCH_Y, 90, "", body, PS, acc,
-                  depth=d, step=1.3, bord=4, shadow_off=d * 1.3 + 4, tint_band=band)
+                  depth=d, step=1.3, bord=4, shadow_off=d * 1.3 + 4, tint_band=band,
+                  glow=CAP.get("glow", 7))
 
     if c.get("bang"):
         x = W / 2 - _punch_font.getlength(c["punch"]) / 2 - CAP.get("bang_gap", 80)
@@ -307,9 +314,9 @@ for c in cfg["captions"]:
                     rf"\t(0,130,\frz14\fscx125\fscy125)\t(130,230,\frz8\fscx100\fscy100)")
         for k in range(5, 0, -1):
             ev.append(f"Dialogue: {35 - k},{t_ass(pa + 0.05)},{t_ass(end)},Txt,,0,0,0,,"
-                      f"{{{bang_tags(k * 1.4)}\\1c&H101070&\\3c&H101070&\\bord4\\shad0}}?!")
+                      f"{{{bang_tags(k * 1.4)}\\1c{bgr(GOLD)}\\3c{bgr(GOLD)}\\bord4\\shad0}}?!")
         ev.append(f"Dialogue: 36,{t_ass(pa + 0.05)},{t_ass(end)},Txt,,0,0,0,,"
-                  f"{{{bang_tags(0)}\\1c&H2A2AFF&\\3c&HFFFFFF&\\bord4\\shad0}}?!")
+                  f"{{{bang_tags(0)}\\1c&HFFFFFF&\\3c&H101010&\\bord4\\shad0}}?!")
         c["_bang_at"] = pa + 0.05
 
 ass = f"""[Script Info]
@@ -322,7 +329,7 @@ WrapStyle: 2
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Txt,{_fullname['bold']},{PS},&H00FFFFFF,&H00FFFFFF,&H00101010,&H00000000,0,0,0,0,100,100,0,0,1,4,0,2,0,0,0,1
-Style: Mark,Arial,20,&H202A2AFF,&H202A2AFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
+Style: Mark,Arial,20,&H2000C8FF,&H2000C8FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
